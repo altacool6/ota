@@ -1,0 +1,1 @@
+javac  -classpath ../package/core.jar test.java

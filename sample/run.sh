@@ -1,0 +1,1 @@
+java -classpath ../package/core.jar:. test
