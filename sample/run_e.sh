@@ -1,1 +1,1 @@
-java -classpath ../package/core.jar:. -Dota.log.level=ERROR test
+java -cp ../out/core.jar:../out/variety_maus.jar:. -Dota.log.level=ERROR test

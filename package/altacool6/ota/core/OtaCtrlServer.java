@@ -1,21 +1,26 @@
+/* Ota Control Server is abstract class.
+   User should extends this class 
+   and implements 4 abstract methods(connect/disconnect/requestCheckingFile/getOtaStorageServer).
+   The 4 methods called internally by OTA Client. */
+
 package altacool6.ota.core;
 
-abstract class OtaCtrlServer extends Thread{
+public abstract class OtaCtrlServer extends Thread{
     private lOtaFileInfo mFileInfo;
     private lEventListener mListener;
 
-    public void startAsyncCheck(lOtaFileInfo fileInfo, lEventListener listener){
+    protected abstract Result           connect();
+    protected abstract void             disconnect();
+    protected abstract Result           requestCheckingFile();
+    protected abstract OtaStorageServer getOtaStorageServer();
+
+    protected final void startAsyncCheck(lOtaFileInfo fileInfo, lEventListener listener){
         mFileInfo = fileInfo;
         mListener = listener;
         start();
     }
 
-    abstract Result connect();
-    abstract void disconnect();
-    abstract Result requestCheckingFile();
-    abstract OtaStorageServer getOtaStorageServer();
-
-    public void run() {
+    public final void run() {
         Result ret;
 
         ret = connect();
@@ -37,7 +42,7 @@ abstract class OtaCtrlServer extends Thread{
         }
     }
 
-    abstract class Response {
+    public abstract class Response {
         private OtaRequest mRequest;
 
         private int fileSize;
@@ -54,11 +59,11 @@ abstract class OtaCtrlServer extends Thread{
         public abstract OtaStorageServer getOtaStorageServer();
     }
 
-    interface lEventListener {
+    public interface lEventListener {
         void onEventByCtrlServer(Response response);
     }
 
-    enum Result{SUCCESS, CONNECTION_FAILURE, NOT_SUPPORTED_FILE, NO_NEED_DOWNLOAD, NEED_DOWNLOAD};
+    public enum Result{SUCCESS, CONNECTION_FAILURE, NOT_SUPPORTED_FILE, NO_NEED_DOWNLOAD, NEED_DOWNLOAD};
 }
 
 

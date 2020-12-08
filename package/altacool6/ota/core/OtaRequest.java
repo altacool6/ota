@@ -1,6 +1,6 @@
 package altacool6.ota.core;
 
-abstract class OtaRequest {
+public abstract class OtaRequest {
     private String mDownloadPath;
 
     public String getDownloadPath() { return mDownloadPath; }

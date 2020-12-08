@@ -1,1 +1,1 @@
-javac  -classpath ../package/core.jar test.java
+javac -cp ../out/core.jar:../out/variety_maus.jar:. test.java

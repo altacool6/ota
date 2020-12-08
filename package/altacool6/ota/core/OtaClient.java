@@ -18,9 +18,12 @@ public class OtaClient extends Thread
         mRequestQ = new LinkedList<OtaRequest>();
         mResponseByCtrl = new LinkedList<OtaCtrlServer.Response>();
         mResponseByStorage = new LinkedList<OtaStorageServer.Response>();
+
+        OtaLog.I(OtaLog.FLAG_CLIENT, "Create OtaClient instance.");
     }
 
     public void addRequest(OtaRequest request){
+        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an request.");
         synchronized(mRequestQ){
             mRequestQ.offer(request);
         }
@@ -28,6 +31,7 @@ public class OtaClient extends Thread
 
     @Override
     public void onEventByCtrlServer(OtaCtrlServer.Response response) {
+        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an response via Control Server.");
         synchronized(mResponseByCtrl) {
             mResponseByCtrl.offer(response);
         }
@@ -35,11 +39,14 @@ public class OtaClient extends Thread
 
     @Override
     public void onEventByStorageServer(OtaStorageServer.Response response) {
+        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an response via Storage Server.");
         synchronized(mResponseByStorage) {
             mResponseByStorage.offer(response);
         }
     }
     public void run() {
+        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient thread is started.");
+
         while (true){
             OtaRequest request = null;
 
@@ -78,8 +85,8 @@ public class OtaClient extends Thread
 
             }
 
-
             try {
+                OtaLog.D(OtaLog.FLAG_CLIENT, "OtaClient thread is working now");
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
