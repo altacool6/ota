@@ -1,6 +1,8 @@
 import altacool6.ota.core.OtaClient;
 import altacool6.ota.core.OtaRequest;
+
 import altacool6.ota.variety.maus.Request;
+import altacool6.ota.variety.maus.CtrlServer;
 
 public class test{
     public static void main(String args[]){
@@ -10,7 +12,10 @@ public class test{
 
         a.start();
 
-        OtaRequest request = new Request("/data/data/fw/bin", "12.1.3");
+        boolean bNeedConfirm = true;
+        OtaRequest request = new Request("PATH", "ID", "VALUE", bNeedConfirm, 
+                                         new CtrlServer(),
+                                         result->System.out.println("User response : "+ result));
 
         a.addRequest(request);
     }

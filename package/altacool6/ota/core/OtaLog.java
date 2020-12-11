@@ -1,6 +1,12 @@
 package altacool6.ota.core;
 
 public class OtaLog{
+    public interface ILogout {
+        void printf(String msg);
+    }; 
+
+    private static ILogout mExternalOutway = null;
+    
     public static final int ERROR = 0;
     public static final int WARN  = 1;
     public static final int INFO  = 2;
@@ -26,7 +32,9 @@ public class OtaLog{
             else if (level.equalsIgnoreCase("DEBUG")){ LOG_LEVEL = DEBUG;}
             else                                     { LOG_LEVEL = DEBUG;}
         } 
-
+    }
+    public static void setExternalOutway(ILogout way){
+        mExternalOutway = way;
     }
 
     public static int SetMask(int flags){
@@ -35,8 +43,12 @@ public class OtaLog{
     }
 
     private static void _print(int flag, String msg){
-        if ((MASK & flag) != 0 )
-            System.out.println(msg);
+        if ((MASK & flag) != 0 ){
+            if (mExternalOutway == null)
+                System.out.println(msg);
+            else 
+                mExternalOutway.printf(msg);
+        }
     }
 
     public static void E(int flag, String msg){

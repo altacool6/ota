@@ -2,29 +2,35 @@ package altacool6.ota.variety.maus;
 
 import altacool6.ota.core.OtaCtrlServer;
 import altacool6.ota.core.OtaStorageServer;
-import altacool6.ota.core.lOtaFileInfo;
+import altacool6.ota.core.OtaRequest;
 
-class CtrlServer extends OtaCtrlServer{
-    private lOtaFileInfo mFileInfo;
-    private OtaStorageServer mStorageServer; 
+import static altacool6.ota.core.OtaRequest.lFileInfo;
+import static altacool6.ota.core.OtaCtrlServer.Response;
+import static altacool6.ota.core.OtaCtrlServer.Response.CONNECTION_SUCCESS;
+import static altacool6.ota.core.OtaCtrlServer.Response.CONNECTION_SUCCESS;
+import static altacool6.ota.core.OtaCtrlServer.Response.CONNECTION_FAILURE;
+import static altacool6.ota.core.OtaCtrlServer.Response.NOT_SUPPORTED_FILE;
+import static altacool6.ota.core.OtaCtrlServer.Response.NO_NEED_DOWNLOAD;
+import static altacool6.ota.core.OtaCtrlServer.Response.NEED_DOWNLOAD;
+import static altacool6.ota.core.OtaCtrlServer.Response.DISCONNECTED;
 
-    public CtrlServer(lOtaFileInfo fileInfo){
-        mFileInfo = fileInfo;
+public class CtrlServer extends OtaCtrlServer{
+
+    protected Response _connect(){
+        return new Response(CONNECTION_SUCCESS, null, null);
     }
-    protected Result connect(){
-        return OtaCtrlServer.Result.SUCCESS;
+
+    protected void _disconnect(){
+        return;
     }
 
-    protected void disconnect(){
-    }
+    protected Response _requestCheckingFile(lFileInfo fileInfo){
+        int result = NOT_SUPPORTED_FILE;
+        //result = NO_NEED_DOWNLOAD;
+        //result = NEED_DOWNLOAD;
 
-    protected Result requestCheckingFile(){
-        mStorageServer = new StorageServer();
+        Response response = new Response(result, null, new StorageServer());
         
-        return OtaCtrlServer.Result.NO_NEED_DOWNLOAD;
-    }
-
-    protected OtaStorageServer getOtaStorageServer(){
-        return mStorageServer;
+        return response;
     }
 }

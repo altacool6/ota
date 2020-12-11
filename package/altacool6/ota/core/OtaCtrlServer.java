@@ -5,65 +5,123 @@
 
 package altacool6.ota.core;
 
+import java.util.LinkedList;
+import java.util.Queue;
+
 public abstract class OtaCtrlServer extends Thread{
-    private lOtaFileInfo mFileInfo;
-    private lEventListener mListener;
+    protected abstract Response _connect();
+    protected abstract void     _disconnect();
+    protected abstract Response _requestCheckingFile(OtaRequest.lFileInfo fileInfo);
+    ////////////////////////////////////////////////////////////////////////////////
 
-    protected abstract Result           connect();
-    protected abstract void             disconnect();
-    protected abstract Result           requestCheckingFile();
-    protected abstract OtaStorageServer getOtaStorageServer();
+    private boolean bInit = false;
+    private lConsumedMonitor consumedMonitor = null;
+    private lEventListener   eventListener = null;
 
-    protected final void startAsyncCheck(lOtaFileInfo fileInfo, lEventListener listener){
-        mFileInfo = fileInfo;
-        mListener = listener;
-        start();
+    private Queue<Request> requestQ;
+
+    protected final void _Init(lConsumedMonitor consumedMonitor, lEventListener eventListener) {
+        if (!bInit) {
+            requestQ = new LinkedList<Request>();
+
+            if (requestQ != null) {
+                this.consumedMonitor = consumedMonitor;
+                this.eventListener   = eventListener;
+                bInit = true;
+            }
+        }
+    }
+
+    protected final void _AddRequest(Request request) {
+        requestQ.offer(request);
+
+        Thread.State state = getState();
+
+        if (state == Thread.State.NEW)
+            start();
     }
 
     public final void run() {
-        Result ret;
+        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient thread is started.");
+        long lastTime = 0, curTime= 0; 
 
-        ret = connect();
-        if (ret != Result.SUCCESS) {
-            //mListener.onEventByCtrlServer();
+        while (true){
+            OtaRequest userRequest = null;
+            Request  request = null;
+            Response response = null;
+            OtaRequest.lFileInfo fileInfo = null;
+
+            synchronized(requestQ) {
+                if (requestQ.isEmpty()){
+                    long idleTime = System.nanoTime() - lastTime;
+
+                    if ((idleTime/1000000000) > 5) break;
+
+                    continue;
+                }
+
+                lastTime = System.nanoTime(); 
+
+                request     = requestQ.poll();
+                userRequest = request.getUserRequest();
+
+                fileInfo = userRequest.getOtaFileInfo();
+
+                response =_requestCheckingFile(fileInfo);
+
+                eventListener.onEventByCtrlServer(response);
+            }            
         }
 
-        ret = requestCheckingFile();
-        if (ret != Result.SUCCESS &&
-                ret != Result.NO_NEED_DOWNLOAD &&
-                ret != Result.NEED_DOWNLOAD) {
-            //mListener.onEventByCtrlServer();
-        }
-
-        disconnect();
-
-        if (ret != Result.NEED_DOWNLOAD) {
-            //mListener.onEventByCtrlServer();
-        }
+        consumedMonitor.consumed(this);
     }
 
-    public abstract class Response {
-        private OtaRequest mRequest;
-
-        private int fileSize;
-        private int fileName;
-        private String comment;
-
-        public OtaRequest getOtaRequest(){
-            return mRequest;
-        }
-        public void setOtaRequest(OtaRequest request){
-            mRequest = request;
+        
+    public static class Request{
+        private OtaRequest generatedReq;
+        
+        public Request(OtaRequest generatedReq){
+            this.generatedReq = generatedReq;
         }
 
-        public abstract OtaStorageServer getOtaStorageServer();
+        public OtaRequest getUserRequest(){
+            return generatedReq;
+        }
+    }
+    public static class Response {
+        public static final int CONNECTION_SUCCESS = 0;
+        public static final int CONNECTION_FAILURE = 1;
+        public static final int NOT_SUPPORTED_FILE = 2;
+        public static final int NO_NEED_DOWNLOAD   = 3;
+        public static final int NEED_DOWNLOAD      = 4;
+        public static final int DISCONNECTED       = 5;
+
+        private int        result;
+        private OtaRequest request;
+        private OtaStorageServer storageServer;
+
+        private int        fileSize;
+        private int        fileName;
+        private String     comment;
+
+        public Response(int ret, OtaRequest request, OtaStorageServer server){
+            this.result = ret;
+            this.request = request;
+            this.storageServer = server;
+        }
+
+        protected final int              getResult()           { return result; }
+        protected final OtaRequest       getOtaRequest()       { return request; }
+        protected final OtaStorageServer getOtaStorageServer() { return storageServer; };
     }
 
     public interface lEventListener {
         void onEventByCtrlServer(Response response);
     }
 
-    public enum Result{SUCCESS, CONNECTION_FAILURE, NOT_SUPPORTED_FILE, NO_NEED_DOWNLOAD, NEED_DOWNLOAD};
+    public interface lConsumedMonitor{
+        void consumed(OtaCtrlServer ctrlServer);
+    }
 }
 
 
