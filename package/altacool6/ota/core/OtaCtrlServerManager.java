@@ -10,7 +10,7 @@ public class OtaCtrlServerManager {
         connectedServers = new LinkedList<OtaCtrlServer>();
     }
 
-    protected synchronized boolean _Connect(OtaRequest otaRequest, OtaCtrlServer.lEventListener eventListener){
+    protected synchronized boolean _AllocateRequestToServer(OtaRequest otaRequest, OtaCtrlServer.lEventListener eventListener){
         boolean bConnected = false;
         
         OtaCtrlServer          ctrlServerInReq  = otaRequest.getOtaCtrlServer();
@@ -25,12 +25,13 @@ public class OtaCtrlServerManager {
             ctrlServer = connectedServers.get(idx);
 
             response = ctrlServer._connect();
+            eventListener.onEventByCtrlServer(response);
 
             if (response.getResult() != OtaCtrlServer.Response.CONNECTION_SUCCESS)
                 return bConnected;
 
             connectedServers.add(ctrlServer);
-            ctrlServer._Init((a)->__Disconnect(a), eventListener);
+            ctrlServer._Init((server)->__FinalizeServer(server), eventListener);
         }
 
         bConnected = true;
@@ -41,7 +42,7 @@ public class OtaCtrlServerManager {
         return bConnected;
     }
 
-    private synchronized void __Disconnect(OtaCtrlServer ctrlServer){
+    private synchronized void __FinalizeServer(OtaCtrlServer ctrlServer){
         int idx = connectedServers.indexOf(ctrlServer);
 
         //assert (idx > 0) : "The CtrlServer what is trying disconnect should be in connectedServers list.";
