@@ -22,15 +22,18 @@ public class OtaClient extends Thread
     }
 
     // instance member
-    private Queue<OtaRequest>                    requestQ;
-
-    private OtaCtrlServerManager              ctrlServerMgr;
+    private Queue<OtaRequest>                    requestQ;              // user request queueing
+    private OtaRequestLoader                    requestStriper;
 
     private Map<Integer, OtaCtrlServer.Response> pendingResponse4Confirm;
 
-    private Queue<OtaCtrlServer.Response>        pendingResponse4Download;
+    //private Queue<OtaCtrlServer.Response>        pendingResponse4Download;
 
-    private Queue<OtaStorageServer.Response > mResponseByStorage;
+    private Queue<OtaStorageServer.Request>        aRequestQ;            // download request queueing
+
+    private OtaARequestStriper                   aRequestStriper;
+
+    private Queue<OtaStorageServer.Response> mResponseByStorage;
     
     
 
@@ -43,16 +46,21 @@ public class OtaClient extends Thread
         MAX_RUNNING_REQUEST = maxRunningCnt;
         
         requestQ     = new LinkedList<OtaRequest>();
+        requestStriper = new OtaRequestLoader();
 
-        ctrlServerMgr = new OtaCtrlServerManager();
+        pendingResponse4Confirm  = new HashMap<Integer, OtaCtrlServer.Response>();
+        //pendingResponse4Download = new LinkedList<OtaCtrlServer.Response>
 
-        pendingResponse4Confirm   = new HashMap<Integer, OtaCtrlServer.Response>();
-        pendingResponse4Download    = new LinkedList<OtaCtrlServer.Response>();
+        aRequestQ = new LinkedList<OtaStorageServer.Request>();
+        aRequestStriper = new OtaARequestStriper();
+
+
         
         mResponseByStorage = new LinkedList<OtaStorageServer.Response>();
         
     }
 
+    // addRequest is ota user's level api.
     public void addRequest(OtaRequest request){
         OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an request.");
         synchronized(requestQ){
@@ -60,14 +68,19 @@ public class OtaClient extends Thread
         }
     }
 
+    // confirmDownload is ota user's level api.
     public boolean confirmDownload(int handle){
-        OtaCtrlServer.Response response = pendingResponse4Confirm.get(handle);
-        if (response == null)
+        OtaCtrlServer.Response response = pendingResponse4Confirm.remove(handle);
+        if (response == null){
+            OtaLog.E(OtaLog.FLAG_CLIENT, "ERROR Wrong handle("+handle+")  valuefor confirming");
             return false;
-        
-        synchronized(pendingResponse4Download) {
-            pendingResponse4Download.offer(response);
         }
+
+        OtaStorageServer.Request aRequest = new OtaStorageServer.Request(response);
+        synchronized(aRequestQ) {
+            aRequestQ.offer(aRequest);
+        }
+
         return true;
     }
 
@@ -87,8 +100,9 @@ public class OtaClient extends Thread
     
         if (result == OtaCtrlServer.Response.NEED_DOWNLOAD){
             if (!request.isNeedUserConfirmForDownload()){       // no need user confirm
-                synchronized(pendingResponse4Download) {
-                    pendingResponse4Download.offer(response);
+                OtaStorageServer.Request aRequest = new OtaStorageServer.Request(response);
+                synchronized(aRequestQ) {
+                    aRequestQ.offer(aRequest);
                 }
             }
             else {                                              // need user confirm
@@ -110,40 +124,32 @@ public class OtaClient extends Thread
         OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient thread is started.");
 
         while (true){
-            OtaRequest request = null;
+            
+            {   //step 1
+                OtaRequest request = null;
+                boolean ret = false;
 
-            synchronized(requestQ) {
-                if (!requestQ.isEmpty())
-                    request = requestQ.poll();
+                synchronized(requestQ) {
+                    if (!requestQ.isEmpty())
+                        request = requestQ.poll();
+                }
+
+                if (request != null)
+                    ret = requestStriper._Stripe(request, this);
             }
 
-            if (request != null) {
-                boolean ret = ctrlServerMgr._AllocateRequestToServer(request, this);
+            {   //step 2
+                OtaStorageServer.Request aRequest = null;
+                boolean ret = false;
+
+                synchronized(aRequestQ) {
+                    if (!aRequestQ.isEmpty())
+                        aRequest = aRequestQ.poll();
+                }
+                if (aRequest != null)
+                    ret = aRequestStriper._Stripe(aRequest, this);
             }
 
-/*
-            OtaCtrlServer.Response response0 = null;
-            synchronized(pendingResponse4Download) {
-                if (!pendingResponse4Download.isEmpty())
-                    response0 = pendingResponse4Download.poll();
-            }
-
-            if (response0 != null) {
-                OtaStorageServer server = response0.getOtaStorageServer();
-                server.startAsyncDownload(this);
-            }
-
-            OtaStorageServer.Response response1 = null;
-
-            synchronized(mResponseByStorage) {
-                if (!mResponseByStorage.isEmpty())
-                    response1 = mResponseByStorage.poll();
-            }
-
-            if (response1 != null) {
-
-            }
-*/
             try {
                 OtaLog.D(OtaLog.FLAG_CLIENT, "OtaClient thread is working now");
                 Thread.sleep(100);

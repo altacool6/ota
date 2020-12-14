@@ -1,6 +1,6 @@
 package altacool6.ota.core;
 
-public abstract class OtaRequest {
+public class OtaRequest {
     public static final int CONNECTION_SUCCESS = 0;
     public static final int CONNECTION_FAILURE = 1;
     public static final int NOT_SUPPORTED_FILE = 2;
