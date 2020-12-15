@@ -1,6 +1,6 @@
 package altacool6.ota.core;
 
-public class OtaLog{
+public class Log{
     public interface ILogout {
         void printf(String msg);
     }; 

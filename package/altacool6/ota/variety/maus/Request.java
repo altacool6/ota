@@ -1,9 +1,9 @@
 package altacool6.ota.variety.maus;
 
 import altacool6.ota.core.OtaRequest;
-import altacool6.ota.core.OtaCtrlServer;
+import altacool6.ota.core.Server;
 
-public class Request extends OtaRequest implements OtaRequest.lFileInfo {
+public class Request extends OtaRequest implements OtaRequest.lContentsInfo {
     private String mId;
     private String mValue;
     
@@ -13,13 +13,13 @@ public class Request extends OtaRequest implements OtaRequest.lFileInfo {
         setDownloadPath(path);
         setNeedUserConfirmForDownload(needConfirm);
         setCallback(callback);
-        setOtaCtrlServer(server);
+        setServer(server);
         mId = id;
         mValue = value;
     }
 
 
-    public lFileInfo getFileInfo(){
+    public lContentsInfo getFileInfo(){
         return this;
     }
 

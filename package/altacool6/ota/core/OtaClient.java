@@ -6,63 +6,42 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class OtaClient extends Thread
-                    implements OtaCtrlServer.lEventListener,
-                               OtaStorageServer.lEventListener {
+                    implements Server.lResponseReceiver{
     // class member
-    private static Map<Integer, Integer> s_mapResp2ReqResult;
+    //private static Map<Integer, Integer> s_mapResp2ReqResult;
     private static int                   s_handle4PendingResp;
     static {
         s_handle4PendingResp = 0;
-        s_mapResp2ReqResult = new HashMap<Integer, Integer>();
-        s_mapResp2ReqResult.put(OtaCtrlServer.Response.CONNECTION_SUCCESS, OtaRequest.CONNECTION_SUCCESS);
-        s_mapResp2ReqResult.put(OtaCtrlServer.Response.CONNECTION_FAILURE, OtaRequest.CONNECTION_FAILURE);
-        s_mapResp2ReqResult.put(OtaCtrlServer.Response.NOT_SUPPORTED_FILE, OtaRequest.NOT_SUPPORTED_FILE);
-        s_mapResp2ReqResult.put(OtaCtrlServer.Response.NO_NEED_DOWNLOAD,   OtaRequest.NO_NEED_DOWNLOAD);
-        s_mapResp2ReqResult.put(OtaCtrlServer.Response.NEED_DOWNLOAD,      OtaRequest.NEED_DOWNLOAD);
+        //s_mapResp2ReqResult = new HashMap<Integer, Integer>();
+        //s_mapResp2ReqResult.put(Server.Response.CONNECTION_SUCCESS, OtaRequest.CONNECTION_SUCCESS);
+        //s_mapResp2ReqResult.put(Server.Response.CONNECTION_FAILURE, OtaRequest.CONNECTION_FAILURE);
+        //s_mapResp2ReqResult.put(Server.Response.NOT_SUPPORTED_FILE, OtaRequest.NOT_SUPPORTED_FILE);
+        //s_mapResp2ReqResult.put(Server.Response.NO_NEED_DOWNLOAD,   OtaRequest.NO_NEED_DOWNLOAD);
+        //s_mapResp2ReqResult.put(Server.Response.NEED_DOWNLOAD,      OtaRequest.NEED_DOWNLOAD);
     }
 
     // instance member
-    private Queue<OtaRequest>                    requestQ;              // user request queueing
-    private OtaRequestLoader                    requestStriper;
-
-    private Map<Integer, OtaCtrlServer.Response> pendingResponse4Confirm;
-
-    //private Queue<OtaCtrlServer.Response>        pendingResponse4Download;
-
-    private Queue<OtaStorageServer.Request>        aRequestQ;            // download request queueing
-
-    private OtaARequestStriper                   aRequestStriper;
-
-    private Queue<OtaStorageServer.Response> mResponseByStorage;
-    
+    private Queue<Request>         requestQ;              // user request queueing
+    private RequestLoader          requestLoader;
+    private Map<Integer, Response> wait4Confirm; 
     
 
     private int MAX_RUNNING_REQUEST;
 
     public OtaClient(int maxRunningCnt){
         super();
-        OtaLog.I(OtaLog.FLAG_CLIENT, "Create OtaClient instance.");
+        Log.I(Log.FLAG_CLIENT, "Create OtaClient instance.");
 
         MAX_RUNNING_REQUEST = maxRunningCnt;
         
-        requestQ     = new LinkedList<OtaRequest>();
-        requestStriper = new OtaRequestLoader();
-
-        pendingResponse4Confirm  = new HashMap<Integer, OtaCtrlServer.Response>();
-        //pendingResponse4Download = new LinkedList<OtaCtrlServer.Response>
-
-        aRequestQ = new LinkedList<OtaStorageServer.Request>();
-        aRequestStriper = new OtaARequestStriper();
-
-
-        
-        mResponseByStorage = new LinkedList<OtaStorageServer.Response>();
-        
+        requestQ      = new LinkedList<Request>();
+        requestLoader = new RequestLoader();
+        wait4Confirm  = new HashMap<Integer, Response>();
     }
 
     // addRequest is ota user's level api.
-    public void addRequest(OtaRequest request){
-        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an request.");
+    public void addRequest(Request request){
+        Log.I(Log.FLAG_CLIENT, "OtaClient get an request.");
         synchronized(requestQ){
             requestQ.offer(request);
         }
@@ -70,88 +49,60 @@ public class OtaClient extends Thread
 
     // confirmDownload is ota user's level api.
     public boolean confirmDownload(int handle){
-        OtaCtrlServer.Response response = pendingResponse4Confirm.remove(handle);
+        Response response = wait4Confirm.remove(handle);
         if (response == null){
-            OtaLog.E(OtaLog.FLAG_CLIENT, "ERROR Wrong handle("+handle+")  valuefor confirming");
+            Log.E(Log.FLAG_CLIENT, "ERROR Wrong handle("+handle+")  valuefor confirming");
             return false;
         }
 
-        OtaStorageServer.Request aRequest = new OtaStorageServer.Request(response);
-        synchronized(aRequestQ) {
-            aRequestQ.offer(aRequest);
-        }
-
+        Request request = response.getRedirectRequest();
+        addRequest(request);
         return true;
     }
 
     @Override
-    public void onEventByCtrlServer(OtaCtrlServer.Response response) {
-        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an response via Control Server.");
+    public void onReceiveResponse(Response response) {
+        Log.I(Log.FLAG_CLIENT, "onReceiveResponse");
 
-        int        result   = response.getResult();
-        OtaRequest           request  = response.getOtaRequest();
-        OtaRequest.lCallback callback = request.getCallback();
-
-        Integer requestResult = s_mapResp2ReqResult.get(result);
-        if (requestResult != null)
-            callback.notify(requestResult);
-        else 
-            OtaLog.E(OtaLog.FLAG_CLIENT, "s_mapResp2ReqResult is wrong. key("+result+")");
-    
-        if (result == OtaCtrlServer.Response.NEED_DOWNLOAD){
-            if (!request.isNeedUserConfirmForDownload()){       // no need user confirm
-                OtaStorageServer.Request aRequest = new OtaStorageServer.Request(response);
-                synchronized(aRequestQ) {
-                    aRequestQ.offer(aRequest);
+        int        result           = response.getResult();
+        Request    sourceRequest    = response.getSourceRequest();
+        Request    redirectRequest  = response.getRedirectRequest();
+        
+        lCallback callback = sourceRequest.getCallback();
+        
+        if (result != Response.NEED_DOWNLOAD) {
+            callback.notify(result, null);
+        }
+        else{
+            if (sourceRequest.isNeedUserConfirm()) {
+                synchronized(wait4Confirm) {
+                    wait4Confirm.put(s_handle4PendingResp++, response);
                 }
+                callback.notify(result, null);
             }
-            else {                                              // need user confirm
-                synchronized(pendingResponse4Confirm) {
-                    pendingResponse4Confirm.put(s_handle4PendingResp++, response);
-                }
+            else {
+                addRequest(redirectRequest);
             }
         }
     }
 
-    @Override
-    public void onEventByStorageServer(OtaStorageServer.Response response) {
-        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient get an response via Storage Server.");
-        synchronized(mResponseByStorage) {
-            mResponseByStorage.offer(response);
-        }
-    }
     public void run() {
-        OtaLog.I(OtaLog.FLAG_CLIENT, "OtaClient thread is started.");
+        Log.I(Log.FLAG_CLIENT, "OtaClient thread is started.");
 
         while (true){
-            
-            {   //step 1
-                OtaRequest request = null;
-                boolean ret = false;
+            Request request = null;
+            boolean ret = false;
 
-                synchronized(requestQ) {
-                    if (!requestQ.isEmpty())
-                        request = requestQ.poll();
-                }
-
-                if (request != null)
-                    ret = requestStriper._Stripe(request, this);
+            synchronized(requestQ) {
+                if (!requestQ.isEmpty())
+                    request = requestQ.poll();
             }
 
-            {   //step 2
-                OtaStorageServer.Request aRequest = null;
-                boolean ret = false;
-
-                synchronized(aRequestQ) {
-                    if (!aRequestQ.isEmpty())
-                        aRequest = aRequestQ.poll();
-                }
-                if (aRequest != null)
-                    ret = aRequestStriper._Stripe(aRequest, this);
-            }
+            if (request != null)
+                ret = requestLoader._Load(request, this);
 
             try {
-                OtaLog.D(OtaLog.FLAG_CLIENT, "OtaClient thread is working now");
+                Log.D(Log.FLAG_CLIENT, "OtaClient thread is working now");
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
