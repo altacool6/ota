@@ -27,7 +27,7 @@ public class RequestLoader {
             // Do Connect & Add ctrlServer at connectedServers list.
             server = serverInReq;
 
-            response = server._connect();
+            response = server._Connect();
             cb.onReceiveResponse(response);
 
             if (response.getResult() != Response.CONNECTION_SUCCESS)
@@ -55,6 +55,6 @@ public class RequestLoader {
 
         connectedServers.remove(idx);
 
-        server._disconnect();
+        server._Disconnect();
     }
 }

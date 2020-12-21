@@ -5,7 +5,7 @@ import java.util.Queue;
 import java.util.Map;
 import java.util.HashMap;
 
-public class OtaClient extends Thread
+public class Agent extends Thread
                     implements Server.lResponseReceiver{
     // class member
     //private static Map<Integer, Integer> s_mapResp2ReqResult;
@@ -13,11 +13,11 @@ public class OtaClient extends Thread
     static {
         s_handle4PendingResp = 0;
         //s_mapResp2ReqResult = new HashMap<Integer, Integer>();
-        //s_mapResp2ReqResult.put(Server.Response.CONNECTION_SUCCESS, OtaRequest.CONNECTION_SUCCESS);
-        //s_mapResp2ReqResult.put(Server.Response.CONNECTION_FAILURE, OtaRequest.CONNECTION_FAILURE);
-        //s_mapResp2ReqResult.put(Server.Response.NOT_SUPPORTED_FILE, OtaRequest.NOT_SUPPORTED_FILE);
-        //s_mapResp2ReqResult.put(Server.Response.NO_NEED_DOWNLOAD,   OtaRequest.NO_NEED_DOWNLOAD);
-        //s_mapResp2ReqResult.put(Server.Response.NEED_DOWNLOAD,      OtaRequest.NEED_DOWNLOAD);
+        //s_mapResp2ReqResult.put(Response.CONNECTION_SUCCESS,      Request.CONNECTION_SUCCESS);
+        //s_mapResp2ReqResult.put(Response.CONNECTION_FAILURE,      Request.CONNECTION_FAILURE);
+        //s_mapResp2ReqResult.put(Response.NOT_SUPPORTED_FILE,      Request.NOT_SUPPORTED_FILE);
+        //s_mapResp2ReqResult.put(Response.CONTENTS_IS_LATEST,      Request.CONTENTS_IS_LATEST);
+        //s_mapResp2ReqResult.put(Response.CONTENTS_NEED_DOWNLOAD,  Request.CONTENTS_NEED_DOWNLOAD);
     }
 
     // instance member
@@ -28,9 +28,9 @@ public class OtaClient extends Thread
 
     private int MAX_RUNNING_REQUEST;
 
-    public OtaClient(int maxRunningCnt){
+    public Agent(int maxRunningCnt){
         super();
-        Log.I(Log.FLAG_CLIENT, "Create OtaClient instance.");
+        Log.I(Log.FLAG_CLIENT, "Create Agent instance.");
 
         MAX_RUNNING_REQUEST = maxRunningCnt;
         
@@ -41,7 +41,7 @@ public class OtaClient extends Thread
 
     // addRequest is ota user's level api.
     public void addRequest(Request request){
-        Log.I(Log.FLAG_CLIENT, "OtaClient get an request.");
+        Log.I(Log.FLAG_CLIENT, "Agent get an request.");
         synchronized(requestQ){
             requestQ.offer(request);
         }
@@ -70,10 +70,10 @@ public class OtaClient extends Thread
         
         lCallback callback = sourceRequest.getCallback();
         
-        if (result != Response.NEED_DOWNLOAD) {
+        if (result != Response.CONTENTS_NEED_DOWNLOAD) {
             callback.notify(result, null);
         }
-        else{
+        else {
             if (sourceRequest.isNeedUserConfirm()) {
                 synchronized(wait4Confirm) {
                     wait4Confirm.put(s_handle4PendingResp++, response);
@@ -81,13 +81,18 @@ public class OtaClient extends Thread
                 callback.notify(result, null);
             }
             else {
-                addRequest(redirectRequest);
+                if (redirectRequest != null)
+                    addRequest(redirectRequest);
+                else {
+                    sourceRequest.setNeedUserConfirm();
+                    addRequest(sourceRequest);
+                }
             }
         }
     }
 
     public void run() {
-        Log.I(Log.FLAG_CLIENT, "OtaClient thread is started.");
+        Log.I(Log.FLAG_CLIENT, "Agent thread is started.");
 
         while (true){
             Request request = null;
@@ -102,7 +107,7 @@ public class OtaClient extends Thread
                 ret = requestLoader._Load(request, this);
 
             try {
-                Log.D(Log.FLAG_CLIENT, "OtaClient thread is working now");
+                Log.D(Log.FLAG_CLIENT, "Agent thread is working now");
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();

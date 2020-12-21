@@ -9,9 +9,9 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 public abstract class Server extends Thread{
-    protected abstract Response _connect();
-    protected abstract void     _disconnect();
-    protected abstract Response _processRequest(lContentsInfo fileInfo);
+    protected abstract Response _Connect();
+    protected abstract void     _Disconnect();
+    protected abstract Response _ProcessRequest(ServerRequest serverRequest);
     ////////////////////////////////////////////////////////////////////////////////
 
     private boolean bInit = false;
@@ -63,11 +63,10 @@ public abstract class Server extends Thread{
                 lastTime = System.nanoTime(); 
 
                 serverRequest = requestQ.poll();
-                sourceRequest = serverRequest.getSourceRequest();
+                //sourceRequest = serverRequest.getSourceRequest();
+                //contentsInfo  = sourceRequest.getContentsInfo();
 
-                contentsInfo  = sourceRequest.getContentsInfo();
-
-                response =_processRequest(contentsInfo);
+                response =_ProcessRequest(serverRequest);
                 responseReceiver.onReceiveResponse(response);
             }            
         }
