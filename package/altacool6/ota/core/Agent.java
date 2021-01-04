@@ -22,7 +22,7 @@ public class Agent extends Thread
 
     // instance member
     private Queue<Request>         requestQ;              // user request queueing
-    private RequestLoader          requestLoader;
+    private RequestAllocator       requestAllocator;
     private Map<Integer, Response> wait4Confirm; 
     
 
@@ -34,9 +34,9 @@ public class Agent extends Thread
 
         MAX_RUNNING_REQUEST = maxRunningCnt;
         
-        requestQ      = new LinkedList<Request>();
-        requestLoader = new RequestLoader();
-        wait4Confirm  = new HashMap<Integer, Response>();
+        requestQ         = new LinkedList<Request>();
+        requestAllocator = new RequestAllocator();
+        wait4Confirm     = new HashMap<Integer, Response>();
     }
 
     // addRequest is ota user's level api.
@@ -104,7 +104,7 @@ public class Agent extends Thread
             }
 
             if (request != null)
-                ret = requestLoader._Load(request, this);
+                ret = requestAllocator._Load(request, this);
 
             try {
                 Log.D(Log.FLAG_CLIENT, "Agent thread is working now");
